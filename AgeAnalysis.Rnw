@@ -1,0 +1,650 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{amscd}
+\usepackage[tableposition=top]{caption}
+\usepackage{ifthen}
+\usepackage[utf8]{inputenc}
+
+\begin{document}
+
+\title{An Sweave Demo for Age project}
+\author{Peacherbird}
+\maketitle
+
+<<>>=
+setwd("/Users/mdarcy100/Desktop/MTroester/AgePaper/AgeManuscript_062011/")
+data.dir <- "./RawData/"
+library(Biobase)
+## library(genefilter)
+library(hgug4112a.db)
+library(gdata)
+## library(pamr)
+library(qvalue)
+## library(cluster)
+library(survival)
+library(gplots)
+library(limma)
+## library(samr)
+library(RColorBrewer)
+## library(GOstats)
+## library(clValid)
+@
+
+MD: can't seem to install made4 package - get error with the first command.  the second works
+1) install.packages("made4", repos = "http://www.bioconductor.org")
+need to install made4 prior to using it
+2) source("http://bioconductor.org/biocLite.R")
+biocLite("made4")
+<<>>=
+library(made4)
+@
+
+MD: needed to also install mclust, flexmix, modeltools,multcomp,mvtnorm for fpc to install
+
+<<>>=
+library(fpc)
+source("age_paper_scripts2.R")
+@
+
+Load processed microarray data sets
+
+<<>>=
+load("all_rm_eset.RData") ## process_All_RMsamples.R
+load("caldas_eset.RData") ## process_CaldasSamples.R
+load("nki295_eset.RData") ## process_NKI295samples.R
+@
+
+Analyze the RM dataset to find genes that show changes with age.  MD NOTE FOR HERSELF:  ALL THIS CODE USES A DATASTRUCTURE called EXPRESSIONSET (ExpressionSet {Biobase})
+
+ Restrict analysis to subjects with age >= 20 who are pre- or peri-
+ menopausal (i.e., menopause = 1 or 2)
+ 
+<<>>=
+preperi.age.eset <- all.rm.eset[,all.rm.eset$age >= 20 &
+                                all.rm.eset$menopause %in% c(1,2)]
+dim(preperi.age.eset)
+@
+
+Basic prefiltering
+Reduce probes to those having an ENTREZ Id
+
+<<>>=
+entrezIds <- mget(featureNames(preperi.age.eset), envir=hgug4112aENTREZID)
+haveEntrezIds <- names(entrezIds)[sapply(entrezIds,function(x) !is.na(x))]
+numNoEntrezId <- length(featureNames(preperi.age.eset)) - length(haveEntrezIds)
+
+age.eset <- preperi.age.eset[haveEntrezIds,]
+
+dim(age.eset)
+@
+Below were Jason's numbers - done in late 2010.  MD had more since more entrez ids
+
+Features  Samples
+   23729       76
+
+
+ Create a new variable 'age.decade' that discretizes age by decade
+ (age.decade = 2 if 20 <= age < 30, etc.)
+
+<<>>=
+age.decade<- cut(age.eset$age,
+                breaks = seq(10,(max(age.eset$age)+10)-max(age.eset$age)%%10,by=10),
+                include.lowest=TRUE,labels=FALSE,right=FALSE)
+
+pData(age.eset)$age.decade <- age.decade
+@
+
+ Determine the interquartile range for each gene - will be used to filter results
+ after applying the empirical Bayes step in Limma
+ With limma
+
+<<>>=
+iqr.age.eset <- esApply(age.eset,1,IQR)
+@
+
+
+*Regression analysis using Limma
+*Regression on age.decade
+
+<<>>=
+design.age.decade <- model.matrix(~ age.eset$age.decade)
+colnames(design.age.decade) <- c("Intercept","age.decade.limma")
+
+age.decade.limma.fit1 <- lmFit(age.eset,design.age.decade)
+age.decade.limma.ebayes <- eBayes(age.decade.limma.fit1)
+@
+
+ Apply IQR cutoff of median(iqr.age.eset)
+
+<<>>=
+age.decade.limma.filtered <- age.decade.limma.ebayes[iqr.age.eset>median(iqr.age.eset),]
+##MD checking dimension
+dim(age.decade.limma.filtered)
+@
+
+this is a summary of the results of the regression - much nicer than what Monica did
+
+<<>>=
+age.decade.limma.summary <- topTable(age.decade.limma.filtered,coef="age.decade.limma",adjust.method="fdr",num=Inf)
+@
+
+MD did this to figure out what the data structure looked like:
+<<>>=
+colnames(age.decade.limma.summary)
+@
+ 
+
+ Distribution of p-values
+<<>>=
+pval.summary(age.decade.limma.summary$P.Value)
+@
+ JASON's values below:  Monica's were slightly different as you can see
+ <1e-04 <0.001  <0.01 <0.025  <0.05   <0.1     <1
+   13    120   1075   2154   3293   4748  11864
+
+<<>>=
+pval.summary(age.decade.limma.summary$adj.P.Val)
+@
+ Jason's values: Monica's were slightly different as you can see
+ <1e-04 <0.001  <0.01 <0.025  <0.05   <0.1     <1
+      0      0      0      2      2    770  11864
+
+
+ Compute qvalue if desired, however the correctness of using this method to
+ Validity of computing q-value based on filtered p-values?
+<<>>=
+q.value.age.decade <- qvalue(p=age.decade.limma.summary$P.Value)
+summary(q.value.age.decade)
+@
+Jason's values below: Monica's were slightly different as you can see
+        <1e-04 <0.001 <0.01 <0.025 <0.05 <0.1    <1
+ p-value     13    120  1075   2154  3293 4748 11864
+ q-value      0      0     2      2  1726 4797 11864
+
+<<>>=
+age.decade.limma.summary$qvalue <- q.value.age.decade$qvalue
+@
+
+<<label=fig1plot,include=FALSE>>=
+plot(age.decade.limma.summary$logFC,
+     -log10(age.decade.limma.summary$P.Value),pch=19,col='blue',
+     xlab='Regression Coefficient',ylab='log10(raw P value)')
+abline(h=-log10(.001),col='green')
+abline(h=-log10(.05),col='purple')
+abline(h=-log10(.1),col='orange')
+@
+\begin{figure}
+\begin{center}
+<<label=fig1,fig=TRUE,echo=FALSE>>=
+<<fig1plot>>
+@
+\end{center}
+\caption{Plotting results from decade regression}
+\label{fig:one}
+\end{figure}
+
+ Regression on age
+
+<<>>=
+design.age <- model.matrix(~ age.eset$age)
+colnames(design.age) <- c("Intercept","age.limma")
+
+age.limma.fit1 <- lmFit(age.eset,design.age)
+age.limma.ebayes <- eBayes(age.limma.fit1)
+
+age.limma.filtered <- age.limma.ebayes[iqr.age.eset>median(iqr.age.eset),]
+age.limma.summary <- topTable(age.limma.filtered,coef="age.limma",adjust.method="fdr",num=Inf)
+
+
+## Distribution of p-values
+pval.summary(age.limma.summary$P.Value)
+## <1e-04 <0.001  <0.01 <0.025  <0.05   <0.1     <1
+##      5     41    574   1391   2465   3925  11864
+##Monica's values:
+#<1e-04 <0.001  <0.01 <0.025  <0.05   <0.1     <1 
+#     5     42    582   1406   2496   3964  11970 
+
+pval.summary(age.limma.summary$adj.P.Val)
+## <1e-04 <0.001  <0.01 <0.025  <0.05   <0.1     <1
+##      0      0      0      0      0      0  11864
+##Monica's values:
+#<1e-04 <0.001  <0.01 <0.025  <0.05   <0.1     <1 
+#     0      0      0      0      0      0  11970 
+
+q.value.age <- qvalue(p=age.limma.summary$P.Value)
+summary(q.value.age)
+
+##         <1e-04 <0.001 <0.01 <0.025 <0.05 <0.1    <1
+## p-value      5     41   574   1391  2465 3925 11864
+## q-value      0      0     0      0     0 1509 11864
+
+##Monica's values:
+#        <1e-04 <0.001 <0.01 <0.025 <0.05 <0.1    <1
+#p-value      5     42   582   1406  2496 3964 11970
+#q-value      0      0     0      0     0 1682 11970
+
+age.limma.summary$qvalue <- q.value.age$qvalue
+@
+<<label=fig2plot,include=FALSE>>=
+plot(age.limma.summary$logFC,-log10(age.limma.summary$P.Value))
+@
+\begin{figure}
+\begin{center}
+<<label=fig2,fig=TRUE,echo=FALSE>>=
+<<fig2plot>>
+@
+\end{center}
+\caption{Plotting results from regression on age (continuous)}
+\label{fig:two}
+\end{figure}
+
+MD: 7/31/11 Re-calculate list of significant genes without fold change parameter because I had gar fewer results than the 
+ original list.  Original code in comments in R code
+ 
+<<>>=
+
+## Select genes that show a greater than 1 fold change and have an
+## adjusted p-value less than 0.1
+
+#sig.age.decade <- age.decade.limma.summary[abs(age.decade.limma.summary$logFC*diff(range(age.eset$age.decade)))>=1.0
+ #                                   & age.decade.limma.summary$adj.P.Val < 0.1,]
+
+sig.age.decade <- age.decade.limma.summary[age.decade.limma.summary$adj.P.Val < 0.1,]
+sig.age.decade.probe <- sig.age.decade$ID
+sig.age.decade.entrez <- unlist(mget(sig.age.decade$ID,env=hgug4112aENTREZID))
+sig.age.decade.symbol <- unlist(mget(sig.age.decade$ID,env=hgug4112aSYMBOL))
+
+###MD added - write out a file of the decade gene list
+#toWrite_SigAge<-cbind(sig.age.decade.probe,sig.age.decade.entrez,sig.age.decade.symbol)
+#write.table(toWrite_SigAge,file="MD_SigGenes_070611.txt",sep="\t",col.names=NA)
+
+print(paste("The number of genes in the final list (do not remove those genes with small fold change):",length(sig.age.decade.entrez)))
+
+toWrite_SigAgeAllFold<-cbind(sig.age.decade.probe,sig.age.decade.entrez,sig.age.decade.symbol)
+write.table(toWrite_SigAgeAllFold,file="MD_SigGenesAllFold_073111.txt",sep="\t",col.names=NA)
+
+## Plot a few genes
+## Green circles are log2(expr), orange line is the fitted regression model, and the blue line
+## is a loess fit. For the plots, age, not age.decade, was used.
+@
+<<label=fig3plot,include=FALSE>>=
+par(mfrow=c(4,4))
+for(i in 33:(33+15)){
+    y <- exprs(age.eset)[sig.age.decade$ID[i],]-median(exprs(age.eset)[sig.age.decade$ID[i],])
+    plot(age.eset$age,y,pch=19,col='green',
+         xlab="Age (years)",ylab="log2(exprs)",main=unlist(mget(sig.age.decade$ID[i],env=hgug4112aSYMBOL)))
+    abline(lm(y~age.eset$age),col='orange')
+    lines(loess.smooth(age.eset$age,y),col="blue")
+}
+@
+\begin{figure}
+\begin{center}
+<<label=fig3,fig=TRUE,echo=FALSE>>=
+<<fig3plot>>
+@
+\end{center}
+\caption{Plotting a few genes, Green circles are log2(expr), orange line is the fitted regression model, and the blue line}
+\label{fig:three}
+\end{figure}
+
+\begin{verbatim}
+Visualizing and clustering samples
+\end{verbatim}
+
+<<>>=
+#################################################################################
+##
+## Visualize Cluster/partition the samples
+##
+#################################################################################
+
+## Get expressions corresponding to genes determined above
+exprs.age.clust <- exprs(age.eset)[sig.age.decade$ID,]
+
+## Age Cluster
+medians.exprs.age.clust <- apply(exprs.age.clust,1,median)
+exprs.age.clust.cent <- t(scale(t(exprs.age.clust),medians.exprs.age.clust))
+
+@
+<<label=fig4plot,include=FALSE>>=
+age.clust.1 <- heatplot(exprs.age.clust.cent,classvec=age.eset$age.decade,
+                        scale='none',method='centroid',returnSampleTree=TRUE)
+@
+
+\begin{figure}
+\begin{center}
+<<label=fig4,fig=TRUE,echo=FALSE>>=
+<<fig4plot>>
+@
+\end{center}
+\caption{Heatmap of clustering based on age}
+\label{fig:four}
+\end{figure}
+
+
+<<>>=
+## Make a matrix with symbols as rownames to use for matching
+exprs.age.clust.cent.symb <- exprs.age.clust.cent
+rownames(exprs.age.clust.cent.symb) <- sig.age.decade.symbol
+col.cols <- ifelse(age.eset$age<25,'yellow','blue')
+
+age.order.ind <- sort.int(age.eset$age,index.return=TRUE)$ix
+exprs.age.order <- exprs.age.clust[,age.order.ind]
+age.decade.order <- age.eset$age.decade[age.order.ind]
+age.cols <- brewer.pal(9,"BuPu")[6:9]
+names(age.cols) <- as.character(unique(age.decade.order))
+col.cols <- age.cols[as.character(age.decade.order)]
+@
+
+<<label=fig5plot,include=FALSE>>=
+heatmap.2(exprs.age.order,
+          Colv="none",
+          dendrogram="row",
+          scale='row',
+          col=greenred(32),
+          trace="none",
+          ColSideColors=col.cols)
+@
+
+\begin{figure}
+\begin{center}
+<<label=fig5,fig=TRUE,echo=FALSE>>=
+<<fig5plot>>
+@
+\end{center}
+\caption{Heatmap of clustering based on decade -data has been sorted prior to cluster}
+\label{fig:five}
+\end{figure}
+
+Use the new gene list to predict on the NKI295 data
+Procedure:
+*Prepare NKI295 data
+*The nki295 expression ratios are most likely (need to verify) log10
+*Determine which probes do not have an Entrez ID either NAs or ''
+ 		more of a problem with 'symbol'
+ *Median center the NKI295 data
+ *Create a new eset
+ *Remove low variability probes - this may not be necessary
+ look at distribution
+<<>>=
+################################################################################
+##
+## Use the new gene list to predict on the NKI295 data
+##
+################################################################################
+
+## Prepare NKI295 data
+## The nki295 expression ratios are most likely (need to verify) log10
+
+## Determine which probes do not have an Entrez ID either NAs or ''
+## more of a problem with 'symbol'
+
+dim(nki295.eset)
+nki295.eset <- nki295.eset[!is.na(featureData(nki295.eset)$geneid),]
+dim(nki295.eset)
+
+if(any(featureData(nki295.eset)$symbol == "")){
+    nki295.eset <- nki295.eset[-which(featureData(nki295.eset)$symbol==""),]
+}
+dim(nki295.eset)
+
+## Median center the NKI295 data
+medians.nki295 <- esApply(nki295.eset,1,median)
+nki295.exprs.scale <- t(scale(t(exprs(nki295.eset)),center=medians.nki295,scale=FALSE))
+
+## Create a new eset
+nki295.scale.eset <- nki295.eset
+exprs(nki295.scale.eset) <- nki295.exprs.scale
+dim(nki295.scale.eset)
+
+## Remove low variability probes - this may not be necessary
+iqr.val.nki295.scale <- esApply(nki295.scale.eset,1,function(x){IQR(x,na.rm = TRUE)})
+
+@
+
+<<label=fig6plot,include=FALSE>>=
+hist(iqr.val.nki295.scale,sqrt(length(iqr.val.nki295.scale)))
+@
+
+\begin{figure}
+\begin{center}
+<<label=fig6,fig=TRUE,echo=FALSE>>=
+<<fig6plot>>
+@
+\end{center}
+\caption{distribution of variability of expression over arrays}
+\label{fig:six}
+\end{figure}
+
+<<>>=
+high.iqr.inds.nki295 <- which(iqr.val.nki295.scale > median(iqr.val.nki295.scale))
+
+nki295.scale.eset <- nki295.scale.eset[high.iqr.inds.nki295,]
+dim(nki295.scale.eset)
+
+high.iqr.probes.nki295 <- mod.findLargest(featureNames(nki295.scale.eset),
+                                          iqr.val.nki295.scale[high.iqr.inds.nki295],
+                                         featureData(nki295.scale.eset)$symbol)
+                                         
+                                         
+nki295.scale.eset <- nki295.scale.eset[high.iqr.probes.nki295,]
+dim(nki295.scale.eset)
+@
+
+Remove genes with more than one value in the geneid - This is very confusing. In some cases a probe matches to two different symbols/ids,
+both of which are distinct and valid. In other cases one or more of the ids/symbols are invalid.  To avoid confusion, conduct analysis without the mult. ids (approx 317)
+
+<<>>=
+all(grep("\\|",featureData(nki295.scale.eset)$symbol) == grep("\\|",featureData(nki295.scale.eset)$geneid))
+
+nki295.mult.inds <- grep("\\|",featureData(nki295.scale.eset)$symbol)
+nki295.mult.ids <- cbind(featureData(nki295.scale.eset)$geneid[nki295.mult.inds],featureData(nki295.scale.eset)$symbol[nki295.mult.inds])
+
+nki295.scale.eset <- nki295.scale.eset[-nki295.mult.inds,]
+dim(nki295.scale.eset)
+@
+
+Map probes found from Limma analysis of RM data to entrez ids for the NKI295 data.  I have not fully QC'd the matching - could be a better way of doing this.
+
+<<>>=
+lm.age.list.entrez <- na.omit(sig.age.decade.entrez)
+lm.age.list.symbol <- na.omit(sig.age.decade.symbol)
+
+
+nki.match.vec <- vector("numeric",length=dim(nki295.scale.eset)["Features"])
+names(nki.match.vec) <- featureNames(nki295.scale.eset)
+
+for(e.id in unique(lm.age.list.entrez)){
+    e.id.pattern <- paste("(^",e.id,"$|\\|",e.id,"$|^",e.id,"\\|$|\\|",e.id,"\\|)",sep="")
+    nki.match.ind <- grepl(e.id.pattern,featureData(nki295.scale.eset)$geneid)
+    if(any(nki.match.ind)){
+        nki.match.vec[nki.match.ind] <- nki.match.vec[nki.match.ind]+1
+    }
+}
+
+nki.gene.match.full <- names(nki.match.vec[nki.match.vec !=0])
+nkiSub.eset <- nki295.scale.eset[nki.gene.match.full,]
+dim(nkiSub.eset)
+@
+
+Now look at the Caldas dataset
+
+<<>>=
+common.genes.nki.caldas <- intersect(featureNames(caldas.eset),featureData(nkiSub.eset)$symbol)
+different.genes.nki.caldas <- setdiff(featureNames(caldas.eset),featureData(nkiSub.eset)$symbol)
+length(common.genes.nki.caldas)
+length(different.genes.nki.caldas)
+
+nkiSub.eset <- nkiSub.eset[featureData(nkiSub.eset)$symbol %in% common.genes.nki.caldas,]
+dim(nkiSub.eset)
+
+featureData(nkiSub.eset)$symbol
+
+@
+
+NOW we will cluster the NKI295 data using the RM derived gene list
+<<>>=
+
+nki.pam.2.daisy <- pam(daisy(t(exprs(nkiSub.eset))),2)
+## nki.pam.2.dist <- pam(as.dist(1-cor((exprs(nkiSub.eset)))),2)
+## nki.pam.eucl <- pam(t(nkiSub.exprs.scale),2)
+@
+
+<<label=fig7plot,include=FALSE>>=
+clusplot(nki.pam.2.daisy, labels = 2, col.p = nki.pam.2.daisy$clustering)
+@
+
+\begin{figure}
+\begin{center}
+<<label=fig7,fig=TRUE,echo=FALSE>>=
+<<fig7plot>>
+@
+\end{center}
+\caption{Cluster of NKI data}
+\label{fig:seven}
+\end{figure}
+
+<<>>=
+all(colnames(nkiSub.eset) ==  names(nki.pam.2.daisy$clustering))
+
+nki.clust.ind <- sort.int(nki.pam.2.daisy$clustering, index.return=TRUE)$ix
+
+pData(nkiSub.eset)$clustering <- nki.pam.2.daisy$clustering
+
+###MD is getting an error below;  will try with nki.clust.ind instead of clust.ind
+#nki.pam.clust.sort <- names(nki.pam.2.daisy$clustering[clust.ind])
+nki.pam.clust.sort <- names(nki.pam.2.daisy$clustering[nki.clust.ind])
+nkiSub.clust.eset <- nkiSub.eset[,nki.clust.ind]
+@
+
+<<label=fig8plot,include=FALSE>>=
+heatmap.2(exprs(nkiSub.clust.eset),
+          dendrogram="row",
+          trace = "none",
+          Rowv = TRUE,
+          Colv = FALSE,
+          scale="none",
+          col=greenred(11),
+          ColSideColors = ifelse(nkiSub.clust.eset$clustering == 1, "blue","red"))
+@
+
+\begin{figure}
+\begin{center}
+<<label=fig8,fig=TRUE,echo=FALSE>>=
+<<fig8plot>>
+@
+\end{center}
+\caption{heatmap of clustered NKI subset data}
+\label{fig:eight}
+\end{figure}
+
+Overall survival for NKI patients
+<<>>=
+nki.surv.clust.death <- coxph(Surv(nkiSub.clust.eset$"survival(death)",nkiSub.clust.eset$"event_death" ) ~
+                    +factor(nkiSub.clust.eset$clustering))
+summary(nki.surv.clust.death)
+@
+
+<<label=fig9plot,include=FALSE>>=
+plot(survfit(Surv(nkiSub.clust.eset$"survival(death)",nkiSub.clust.eset$"event_death" ) ~
+                    +factor(nkiSub.clust.eset$clustering)),
+     lty = 1:2,col=c("blue","orange"), mark.time = TRUE, ylab = "Probability",
+     xlab = "Survival Time")
+legend(15, 1, legend = c("cluster 1", "cluster 2"), lty = c(1,2)
+       , bty = "n")
+@
+
+\begin{figure}
+\begin{center}
+<<label=fig9,fig=TRUE,echo=FALSE>>=
+<<fig9plot>>
+@
+\end{center}
+\caption{Survival curves for NKI patients}
+\label{fig:nine}
+\end{figure}
+
+NOW we will cluster the Caldas data using the RM derived gene list
+
+<<>>=
+caldasSub.eset <- caldas.eset[which(featureNames(caldas.eset) %in% common.genes.nki.caldas),]
+dim(caldasSub.eset)
+caldas.pam.2.daisy <- pam(daisy(t(exprs(caldasSub.eset))),2)
+@
+
+<<label=fig10plot,include=FALSE>>=
+clusplot(caldas.pam.2.daisy, labels = 2, col.p = caldas.pam.2.daisy$clustering)
+@
+
+\begin{figure}
+\begin{center}
+<<label=fig10,fig=TRUE,echo=FALSE>>=
+<<fig10plot>>
+@
+\end{center}
+\caption{Cluster of Caldas data}
+\label{fig:eight}
+\end{figure}
+
+<<>>=
+all(colnames(caldasSub.eset) ==  names(caldas.pam.2.daisy$clustering))
+
+caldas.clust.ind <- sort.int(caldas.pam.2.daisy$clustering, index.return=TRUE)$ix
+
+pData(caldasSub.eset)$clustering <- caldas.pam.2.daisy$clustering
+caldas.pam.clust.sort <- names(caldas.pam.2.daisy$clustering[caldas.clust.ind])
+
+caldasSub.clust.eset <- caldasSub.eset[,caldas.clust.ind]
+@
+
+<<label=fig11plot,include=FALSE>>=
+heatmap.2(exprs(caldasSub.clust.eset),
+          dendrogram="row",
+          trace = "none",
+          Rowv = TRUE,
+          Colv = FALSE,
+          scale="none",
+          col=greenred(11),
+          ColSideColors = ifelse(caldasSub.clust.eset$clustering == 1, "blue","red"))
+@
+\begin{figure}
+\begin{center}
+<<label=fig11,fig=TRUE,echo=FALSE>>=
+<<fig11plot>>
+@
+\end{center}
+\caption{Heatmap of clustered Caldas subset data}
+\label{fig:eleven}
+\end{figure}
+
+Survival analysis for Caldas sample
+Restrict to samples where 'Death' == 0 or 1
+
+<<>>=
+caldas.test.ind <- which(caldasSub.clust.eset$Dead == 0 | caldasSub.clust.eset$Dead == 1)
+caldas.surv.clust.death <- coxph(Surv(caldasSub.clust.eset[,caldas.test.ind]$Survival/12,caldasSub.clust.eset[,caldas.test.ind]$Dead ) ~
+                    +factor(caldasSub.clust.eset[,caldas.test.ind]$clustering))
+summary(caldas.surv.clust.death)
+@
+
+<<label=fig12plot,include=FALSE>>=
+plot(survfit(Surv(caldasSub.clust.eset[,caldas.test.ind]$Survival/12,caldasSub.clust.eset[,caldas.test.ind]$Dead) ~
+                    +factor(caldasSub.clust.eset[,caldas.test.ind]$clustering)),lty = 1:2,col=c("blue","orange"), mark.time = TRUE, ylab = "Probability",
+     xlab = "Survival Time")
+
+legend(15, 1, legend = c("cluster 1", "cluster 2"), lty = c(1,2), bty = "n")
+
+@
+  
+  \begin{figure}
+\begin{center}
+<<label=fig12,fig=TRUE,echo=FALSE>>=
+<<fig12plot>>
+@
+\end{center}
+\caption{Survival curves for Caldas samples}
+\label{fig:twelve}
+\end{figure}
+
+\end{document}
