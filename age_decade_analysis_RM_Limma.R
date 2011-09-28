@@ -235,7 +235,7 @@ sig.age.decade.fold.symbol <- unlist(mget(sig.age.decade.fold$ID,env=hgug4112aSY
 
 ###MD added - write out a file of the decade gene list
 toWrite_SigAge<-cbind(sig.age.decade.fold.probe,sig.age.decade.fold.entrez,sig.age.decade.fold.symbol)
-write.table(toWrite_SigAge,file="MD_SigGenes_080311.txt",sep="\t",col.names=NA)
+write.table(toWrite_SigAge,file=paste("SigGenesFold_", Sys.Date(),".txt",sep=""),sep="\t",col.names=NA)
 
 #MD - try again without the fold change parameter because I had gar fewer results than the 
 # original list
@@ -247,7 +247,7 @@ sig.age.decade.symbol <- unlist(mget(sig.age.decade$ID,env=hgug4112aSYMBOL))
 
 
 toWrite_SigAgeAllFold<-cbind(sig.age.decade.probe,sig.age.decade.entrez,sig.age.decade.symbol)
-write.table(toWrite_SigAgeAllFold,file="MD_SigGenesAllFold_080311.txt",sep="\t",col.names=NA)
+write.table(toWrite_SigAgeAllFold,file=paste("SigGenesAllFold_", Sys.Date(),".txt",sep=""),sep="\t",col.names=NA)
 
 
 ## Plot a few genes
@@ -282,17 +282,17 @@ exprs.age.clust.nki <- exprs(age.eset)[sig.age.decade.fold$ID,]
 ###   Save files for future use and manipulation when doing Creighton method
 ###   Write clusterable files out, ordered by age
 ############################################################################################
-sig.fold.rm.exprs <- age.eset[sig.age.decade.fold$ID,] #only includes those with at least a certain fold change (~165 in Aug 2011)
-sig.full.rm.exprs <-age.eset[sig.age.decade$ID,] #includes all 10% FDR genes (~802 in Aug 2011)
+sig.fold.rm.eset <- age.eset[sig.age.decade.fold$ID,] #only includes those with at least a certain fold change (~165 in Aug 2011)
+sig.full.rm.eset <-age.eset[sig.age.decade$ID,] #includes all 10% FDR genes (~802 in Aug 2011)
 
-save(sig.fold.rm.exprs,file="sig_fold_rm_eset.RData")
-save(sig.full.rm.exprs,file="sig_full_rm_eset.RData")##
+save(sig.fold.rm.eset,file="sig_fold_rm_eset.RData")
+save(sig.full.rm.eset,file="sig_full_rm_eset.RData")##
 
 #order age before writing out to the file
-sig.fold.rm.exprs.order<-exprs(sig.fold.rm.exprs[,order(age.eset$age)])
-sig.full.rm.exprs.order<-exprs(sig.full.rm.exprs[,order(age.eset$age)])
+sig.fold.rm.exprs.order<-exprs(sig.fold.rm.eset[,order(age.eset$age)])
+sig.full.rm.exprs.order<-exprs(sig.full.rm.eset[,order(age.eset$age)])
 
-colname_age_order<-paste("Age:",sig.fold.rm.exprs[,order(age.eset$age)]$age)
+colname_age_order<-paste("Age:",sig.fold.rm.eset[,order(age.eset$age)]$age)
 colnames(sig.fold.rm.exprs.order)<-colname_age_order
 colnames(sig.full.rm.exprs.order)<-colname_age_order
 
@@ -482,6 +482,9 @@ nki.clust.ind <- sort.int(nki.pam.2.daisy$clustering, index.return=TRUE)$ix
 
 pData(nkiSub.eset)$clustering <- nki.pam.2.daisy$clustering
 
+#need to do demographic stuff here
+
+
 ###MD is getting an error below;  will try with nki.clust.ind instead of clust.ind
 #nki.pam.clust.sort <- names(nki.pam.2.daisy$clustering[clust.ind])
 nki.pam.clust.sort <- names(nki.pam.2.daisy$clustering[nki.clust.ind])
@@ -523,16 +526,128 @@ summary(nki.surv.clust.death)
 ## Score (logrank) test = 31.86  on 1 df,   p=1.658e-08
 
 
-#below is the pvalue
+#below is the pvalue for clustering factor
 summary(nki.surv.clust.death)$coef[5]
+
+
+#write the images out to jpeg/pdf files
+jpeg('Figures/NKISurvival.jpg')
+
 plot(survfit(Surv(nkiSub.clust.eset$"survival(death)",nkiSub.clust.eset$"event_death" ) ~
                     +factor(nkiSub.clust.eset$clustering)),
      lty = 1:2,col=c("blue","red"), mark.time = TRUE, ylab = "Probability",
      xlab = "Survival Time",main="NKI survival")
-legend(15, 1, legend = c(paste("cluster 1, N = ",length(nkiSub.clust.eset[,nkiSub.clust.eset$clustering==1]),sep=""), paste("cluster 2, N = ",length(nkiSub.clust.eset[,nkiSub.clust.eset$clustering==2]),sep="")), fill = c("blue", "red"),lty = c(1,2)
+legend(12.5, 1, legend = c(paste("cluster 1, N = ",length(which(factor(nkiSub.clust.eset$clustering)==1)),sep=""), paste("cluster 2, N = ",length(which(factor(nkiSub.clust.eset$clustering)==2)),sep="")), fill = c("blue", "red"),lty = c(1,2)
        , bty = "n", cex = .8)
-       text(15,.2,paste("p = ", round(summary(nki.surv.clust.death)$coef[5],8),sep=''), cex=.7)
+       text(15,0,paste("p = ", round(summary(nki.surv.clust.death)$coef[5],8),sep=''), cex=.8)
+      dev.off()
       
+pdf('Figures/NKISurvival.pdf')
+
+plot(survfit(Surv(nkiSub.clust.eset$"survival(death)",nkiSub.clust.eset$"event_death" ) ~
+                    +factor(nkiSub.clust.eset$clustering)),
+     lty = 1:2,col=c("blue","red"), mark.time = TRUE, ylab = "Probability",
+     xlab = "Survival Time",main="NKI survival")
+legend(12.5, 1, legend = c(paste("cluster 1, N = ",length(which(factor(nkiSub.clust.eset$clustering)==1)),sep=""), paste("cluster 2, N = ",length(which(factor(nkiSub.clust.eset$clustering)==2)),sep="")), fill = c("blue", "red"),lty = c(1,2)
+       , bty = "n", cex = .8)
+       text(15,0,paste("p = ", round(summary(nki.surv.clust.death)$coef[5],8),sep=''), cex=.8)
+      dev.off()      
+############################################################################################### 
+#####	DEMOGRAPHIC INFORMATION ON NKI - need to do this after the survival analysis
+# 		need to find the subtype by getting the largest correlation since it isn't listed
+###############################################################################################   
+max.col <- apply(pData(nkiSub.eset)[,37:41], 1, which.max) 
+#nki_subtype<-data.frame(pData(nki295.eset)[,37:41], column_name=names(pData(nki295.eset)[,37:41])[max.col])
+pData(nkiSub.eset)$subtype<-names(pData(nkiSub.eset)[,37:41])[max.col]
+
+nki_bad <- nkiSub.eset[,nkiSub.eset$clustering==2]
+nki_good <- nkiSub.eset[,nkiSub.eset$clustering==1]
+
+
+##### look at demographic/tumor  characteristics by clusters (good/poor survival)
+
+
+#ER status
+table(nki295.eset$ER)
+#Negative Positive 
+#      69      226 
+table(nki_good$ER)
+table(nki_bad$ER)
+
+#IS this grade?
+# look at grade of tumor - NS
+table(nkiSub.eset$clustering,nkiSub.eset$Grade_3_classes)
+#   Intermediate Poorly diff Well diff
+#   1           66          33        63
+#  2           35          86        12
+
+chisq.test(table(nkiSub.eset$clustering,nkiSub.eset$Grade_3_classes))
+#X-squared = 65.5828, df = 2, p-value = 5.74e-15
+
+
+#Look at clustering and subtype - expected results
+table(nkiSub.eset$clustering,nkiSub.eset$subtype)
+#   Cor.Basal Cor.ERBB2 Cor.LumA Cor.LumB Cor.Normal
+#  1         5        18       72       36         31
+#  2        41        31       14       45          2
+chisq.test(table(nkiSub.eset$clustering,nkiSub.eset$subtype))
+#X-squared = 95.2941, df = 4, p-value < 2.2e-16
+
+####  Look at ER status by clustering - result below is very good and makes sense
+chisq.test(table(nkiSub.eset$clustering,nkiSub.eset$ER))
+table(nkiSub.eset$clustering,nkiSub.eset$ER)  
+  #  Negative Positive
+ # 1        7      155
+ # 2       62       71
+
+#X-squared = 70.5743, df = 1, p-value < 2.2e-16
+
+#SIZE - results make sense I THINK - we will need to convert to centimeters to compare to other data
+ table(nki295.eset$`diameter(mm)`)
+ mean(nki295.eset$`diameter(mm)`,na.rm=TRUE)   #22.53898 overall mean size in mm
+  mean(nki295.eset$`diameter(mm)`/10,na.rm=TRUE) #overall mean size in cm
+  mean(nki_good$`diameter(mm)`/10,na.rm=TRUE) #2.117901 size in good prognosis
+ mean(nki_bad$`diameter(mm)`/10,na.rm=TRUE) #2.419549 size in poor prognosis cluster
+
+ 
+ table(nkiSub.eset$clustering,nkiSub.eset$`diameter(mm)`/10)
+ #table(nki_good$`diameter(mm)`/10)
+ #table(nki_bad$`diameter(mm)`/10)
+ 
+ t.test(nki_bad$`diameter(mm)`/10,nki_good$`diameter(mm)`/10) #t = 2.9511, df = 283.202, p-value = 0.003431
+  
+ # we actully want to show the number of people >= 2 cm, < 2 cm 
+ table(nkiSub.eset$clustering,(nkiSub.eset$`diameter(mm)`/10) >= 2)
+  
+#Age - as expected poor prognosis is slightly younger
+mean(nki295.eset$`Age(years)`)
+#43.97966
+
+ table(nkiSub.eset$clustering,factor(floor(nkiSub.eset$`Age(years)`/10)))
+table(factor(nki_good$`Age(years)`/10)
+table(factor(nki_bad$`Age(years)`/10)
+ mean(nki_good$`Age(years)`) #44.56173
+ mean(nki_bad$`Age(years)`) # 43.27068
+ t.test(nki_good$`Age(years)`,nki_bad$`Age(years)`)
+# t = 1.9946, df = 261.214, p-value = 0.04713
+# summary(pData(nki295.eset))
+
+#Nodes - again these results make sense
+table(nkiSub.eset$clustering,nkiSub.eset$Lymph_node_number_postive)
+
+table(nki295.eset$Lymph_node_number_postive)
+table(nki_good$Lymph_node_number_postive)
+mean(nki_good$Lymph_node_number_postive) #1.172840
+
+table(nki_bad$Lymph_node_number_postive)
+mean(nki_bad$Lymph_node_number_postive) #1.62406
+
+t.test(nki_good$Lymph_node_number_postive,nki_bad$Lymph_node_number_postive)
+#t = -1.7065, df = 229.173, p-value = 0.08926
+############################################################################################### 
+##  END DEMOGRAPHIC TESTS for NKI
+############################################################################################### 
+
 
 ################################################################################
 ##
@@ -614,10 +729,98 @@ summary(caldas.surv.clust.death)
 ## Wald test            = 7.64  on 1 df,   p=0.00571
 ## Score (logrank) test = 8.23  on 1 df,   p=0.004114
 
+#write image to a pdf and jpeg
+jpeg('Figures/CaldasSurvival2.jpg')
 
 plot(survfit(Surv(caldasSub.clust.eset[,caldas.test.ind]$Survival/12,caldasSub.clust.eset[,caldas.test.ind]$Dead) ~
                     +factor(caldasSub.clust.eset[,caldas.test.ind]$clustering)),
-     lty = 1:2,col=c("blue","orange"), mark.time = TRUE, ylab = "Probability",
-     xlab = "Survival Time")
-legend(15, 1, legend = c("cluster 1", "cluster 2"), lty = c(1,2)
-       , bty = "n")
+     lty = 1:2,col=c("red","blue"), mark.time = TRUE, ylab = "Probability",
+     xlab = "Survival Time",main="Caldas survival")
+legend(9, 1, legend = c(paste("cluster 1, N = ",length(which(factor(caldasSub.clust.eset$clustering)==1)),sep=""), paste("cluster 2, N = ",length(which(factor(caldasSub.clust.eset$clustering)==2)),sep="")), fill = c("red", "blue"),lty = c(1,2)
+       , bty = "n", cex = .8)
+
+       text(11,0,paste("p = ", round(summary(caldas.surv.clust.death)$coef[5],3),sep=''), cex=.8)
+       
+       dev.off()
+       
+       pdf('Figures/CaldasSurvival2.pdf')
+
+plot(survfit(Surv(caldasSub.clust.eset[,caldas.test.ind]$Survival/12,caldasSub.clust.eset[,caldas.test.ind]$Dead) ~
+                    +factor(caldasSub.clust.eset[,caldas.test.ind]$clustering)),
+     lty = 1:2,col=c("red","blue"), mark.time = TRUE, ylab = "Probability",
+     xlab = "Survival Time",main="Caldas survival")
+legend(9, 1, legend = c(paste("cluster 1, N = ",length(which(factor(caldasSub.clust.eset$clustering)==1)),sep=""), paste("cluster 2, N = ",length(which(factor(caldasSub.clust.eset$clustering)==2)),sep="")), fill = c("red", "blue"),lty = c(1,2)
+       , bty = "n", cex = .8)
+
+       text(11,0,paste("p = ", round(summary(caldas.surv.clust.death)$coef[5],3),sep=''), cex=.8)
+       
+       dev.off()
+       
+###############################################################################################    
+###############################################################################################   
+###############################################################################################      
+#####	DEMOGRAPHIC INFORMATION ON CALDAS AND NKI - need to do this after the survival analysis
+# 		need to find the subtype by getting the largest correlation since it isn't listed
+#		pData(nkiSub.eset)$clustering # this is how they clustered (will want a table of values)
+###############################################################################################   
+#*****cluster 2 is good prognosis, cluster 1 is poor prognosis - at least in the analysis i just did (9/8/11)
+
+#ER status
+table(caldasSub.eset$clustering,caldasSub.eset$`ER of list 135 details`,na.rm=TRUE))
+chisq.test(table(caldasSub.eset$clustering,caldasSub.eset$`ER of list 135 details`))
+# 0  1 
+# 1 31 25
+#  2  9 68 
+#X-squared = 27.359, df = 1, p-value = 1.690e-07
+
+
+#Size, 1 missing for cluster 2
+table(caldasSub.eset$clustering,caldasSub.eset$Size >=2 ) #look for those >=2 or < 2 cm
+#   FALSE TRUE
+#  1    24   33
+#  2    52   25
+
+mean(mean(caldas.eset$Size, na.rm=TRUE)) # there is missing data
+#[1] 1.864179
+
+#Grade
+table(caldasSub.eset$clustering,factor(caldasSub.eset$Grade))
+# 1  2  3 
+# 35 50 49 
+
+#     1  2  3
+#  1  7 20 30
+#  2 28 30 19
+
+chisq.test(table(caldasSub.eset$clustering,caldasSub.eset$Grade))
+#X-squared = 14.4052, df = 2, p-value = 0.0007446
+
+#Nodes
+table(caldasSub.eset$clustering,factor(caldasSub.eset$`Total nodes`) > 0)
+#        .  0  1 10 11 12 15 16  2  3  4  5  6  7  8  9 DCIS
+#  1  2  1  2  8  1  1  0  0  1 12  5  9  4  3  3  4  1    0
+#  2  5  0  2 17  2  1  1  3  1 13 13  3  2  6  3  3  2    1
+caldas.eset$`Total nodes`  #missing and . are the same?
+
+#subtype
+table(caldasSub.eset$clustering,caldasSub.eset$Call)
+#Basal   Her2   LumA   LumB Normal 
+#    17     21     59     25     13 
+
+mean(caldas.eset$AGE)
+#56.85066
+table(caldasSub.eset$clustering,factor(floor(caldasSub.eset$AGE/10)))
+ # 3  4  5  6  7 
+ # 4 28 43 57  3
+
+#   3  4  5  6  7
+#  1  1 11 13 31  1
+#  2  3 17 30 26  2
+
+
+
+caldas_bad <- caldasSub.eset[,caldasSub.eset$clustering==1]
+caldas_good <- caldasSub.eset[,caldasSub.eset$clustering==2]
+
+mean(caldas_bad$AGE)
+mean(caldas_good$AGE)
