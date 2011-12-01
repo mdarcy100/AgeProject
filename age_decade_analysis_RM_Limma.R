@@ -107,8 +107,6 @@ pData(age.eset)$age.decade <- age.decade
 
 iqr.age.eset <- esApply(age.eset,1,IQR)
 
-
-
 ## Regression analysis using Limma
 
 ## Regression on age.decade
@@ -154,7 +152,7 @@ pval.summary(age.decade.limma.summary$adj.P.Val)
 ## Compute qvalue if desired, however the correctness of using this method to
 ## Validity of computing q-value based on filtered p-values?
 q.value.age.decade <- qvalue(p=age.decade.limma.summary$P.Value)
-summary(q.value.age.decade)
+summary(q.value.age.decade,cuts=c(1e-4,0.001,0.01,0.025,0.05,0.10,0.15,0.20,0.25,1))
 ## Jason's values below
 ##         <1e-04 <0.001 <0.01 <0.025 <0.05 <0.1    <1
 ## p-value     13    120  1075   2154  3293 4748 11864
@@ -163,6 +161,12 @@ summary(q.value.age.decade)
 #        <1e-04 <0.001 <0.01 <0.025 <0.05 <0.1    <1
 #	p-value     14    119  1086   2179  3323 4797 11970
 #	q-value      0      0     2      9  1744 4855 11970
+
+#more cut points
+#        <1e-04 <0.001 <0.01 <0.025 <0.05 <0.1 <0.15 <0.2 <0.25    <1
+#p-value     14    119  1086   2179  3323 4797  5764 6549  7159 11970
+#q-value      0      0     2      9  1744 4855  6724 7996  9135 11970
+
 
 age.decade.limma.summary$qvalue <- q.value.age.decade$qvalue
 

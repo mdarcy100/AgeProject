@@ -97,15 +97,15 @@ hist(apply(exprs(paul.scale.eset),1,median))
 
 ## Remove low variability probes from paul's data
 ## DONT DO THIS - JUST FIND THE OVERLAP
-#iqr.val.paul.scale <- esApply(paul.scale.eset,1,function(x){IQR(x,na.rm = TRUE)})
+iqr.val.paul.scale <- esApply(paul.scale.eset,1,function(x){IQR(x,na.rm = TRUE)})
 
 # they seem to be centered around .5
-#hist(iqr.val.paul.scale,sqrt(length(iqr.val.paul.scale)))
+hist(iqr.val.paul.scale,sqrt(length(iqr.val.paul.scale)))
 
-#high.iqr.inds.paul<- which(iqr.val.paul.scale > median(iqr.val.paul.scale))
+high.iqr.inds.paul<- which(iqr.val.paul.scale > median(iqr.val.paul.scale))
 
-#paul.scale.eset <- paul.scale.eset[high.iqr.inds.paul,]
-#dim(paul.scale.eset)
+paul.scale.eset <- paul.scale.eset[high.iqr.inds.paul,]
+dim(paul.scale.eset)
 ###Features  Samples 
 ###   12963       30 
 
@@ -113,7 +113,9 @@ hist(exprs(paul.scale.eset))
 
 #first narrow down 164 genes to those that exist in Paul's data
 RM_PAUL_OVERLAP.eset <- collapsed.sig.fold.rm.eset[rownames(collapsed.sig.fold.rm.eset)%in% featureData(paul.scale.eset)$EntrezID,]
- dim(RM_PAUL_OVERLAP.eset )
+#there are only 93 genes that have both high variability and occur in our signature
+#93 76
+ dim(RM_PAUL_OVERLAP.eset )  #these are the numbers with low variability probes not removed
 #138  76
 
 hist(apply(exprs(paul.scale.eset),1,sd))
@@ -177,13 +179,13 @@ median(paul_cor[1:9]) #young people
 median(paul_cor[24:30]) #old people
 
 
-barplot(paul_cor[1:30], main ="Correlation  - sorted by age", names.arg=names.arg)
+barplot(paul_cor[2:30], main ="Correlation  - sorted by age", names.arg=colname_age_order[2:30])  #don't include the 17 year old
  median_high=median(paul_cor[20:30])
- median_low=median(paul_cor[1:9])
+ median_low=median(paul_cor[2:9])
  median_middle=median(paul_cor[10:19])
- text(7,.08, "median: age < 30 = .07",col='red',cex=.9,font=2)
- text(17,-.04, "median: 30 <= age < 40 = -.04",col='blue',cex=.9, font=2)
- text(27,-.09, "median: age >= 40 = -.09",col='purple',cex=.9,font=2)
+ text(7,.08, "median age: 20-30 = .08",col='red',cex=.9,font=2)
+ text(17,-.04, "median: 30 <= age < 40 = -.05",col='blue',cex=.9, font=2)
+ text(27,-.09, "median: age >= 40 = -.12",col='purple',cex=.9,font=2)
  
  ages=sort(paulSub.eset$Age)
  group=c("L","L","L","L","L","L","L","L","L","M","M","M","M","M","M","M","M","M","M","H","H","H","H","H","H","H","H","H","H","H")
@@ -196,3 +198,20 @@ barplot(paul_cor[1:30], main ="Correlation  - sorted by age", names.arg=names.ar
   #entrez id is not sorted anymore
 #featureData(paulSub.eset)$EntrezID<-rownames(paul.collapsed.entrezsorted)
 
+
+colors = c('#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#FF6699','#FF6699','#FF6699','#FF6699','#6600CC','#6600CC','#6600CC','#6600CC','#6600CC','#6600CC','#6600CC')
+jpeg('Figures/PaulBarPlot.jpeg')
+barplot(paul_cor[1:30],col=colors,main ="Correlation  - sorted by age")
+dev.off()
+
+
+grp1<-table(rep(c('young','old'), times=c(6,3)))
+grp2<-table(rep(c('young','old'), times=c(4,6)))
+grp3<-table(rep(c('young','old'), times=c(3,8)))
+age_summary<-rbind(grp1,grp2,grp3)
+fisher.test(age_summary)
+
+# fisher exact = 0.2226
+young  <- c(6, 4,3)
+cohort <- c(9,10,11)
+prop.trend.test(young, cohort) #p=.08

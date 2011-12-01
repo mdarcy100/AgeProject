@@ -113,7 +113,16 @@ pval.summary(menopause.limma.summary$P.Value)
 #<1e-04 <0.001  <0.01 <0.025  <0.05   <0.1     <1 
 #    0      2     38    114    273    734  11969  
 
+# still print out the genes that are significant at 5% level
+sig.menopause <- menopause.limma.summary[menopause.limma.summary$P.Value < 0.05,]
+sig.menopause.probe <- sig.menopause$ID
+sig.menopause.entrez <- unlist(mget(sig.menopause$ID,env=hgug4112aENTREZID))
+sig.menopause.symbol <- unlist(mget(sig.menopause$ID,env=hgug4112aSYMBOL))
 
+toWrite_SigMenopause<-cbind(sig.menopause.probe,sig.menopause.entrez,sig.menopause.symbol)
+write.table(toWrite_SigMenopause,file=paste("SigMenopause_", Sys.Date(),".txt",sep=""),sep="\t",col.names=NA)
+
+################ look at q-values
 pval.summary(menopause.limma.summary$adj.P.Val)
 
 #<1e-04 <0.001  <0.01 <0.025  <0.05   <0.1     <1 

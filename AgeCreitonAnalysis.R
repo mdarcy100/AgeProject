@@ -88,8 +88,14 @@ medians.exprs.full.old <- apply(exprs.age.full.old,1,median)
 #will need to set to -1 if < 0 or 1 if > 0 #if young - old < 0 (-1), then expression goes up with age, otherwise down
 age_signature_full<-as.matrix(medians.exprs.full.young-medians.exprs.full.old) 
 age_signature_cast<-as.matrix(apply(age_signature_full,1,castDirection))
+entrez.full<-as.vector(unlist(mget(rownames(age_signature_cast),env=hgug4112aENTREZID)))
+symbol.full <- as.vector(unlist(mget(rownames(age_signature_cast),env=hgug4112aSYMBOL)))
+
 #write out this matrix of 1/-1 values to get relative increases/decreases with age
-#age_names<-rownames(age_signature_full) #vector of probe'ids
+toWrite_UpDown<-cbind(entrez.full,symbol.full,age_signature_cast)
+colnames(toWrite_UpDown)<-c("entrezID","Symbol","AgeIncreaseChange")
+write.table(toWrite_UpDown,file=paste("FullUpDown_", Sys.Date(),".txt",sep=""),sep="\t",col.names=NA)
+
 #####################################################################################
 
 
