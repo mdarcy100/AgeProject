@@ -88,14 +88,14 @@ medians.exprs.full.old <- apply(exprs.age.full.old,1,median)
 #will need to set to -1 if < 0 or 1 if > 0 #if young - old < 0 (-1), then expression goes up with age, otherwise down
 age_signature_full<-as.matrix(medians.exprs.full.young-medians.exprs.full.old) 
 age_signature_cast<-as.matrix(apply(age_signature_full,1,castDirection))
-entrez.full<-as.vector(unlist(mget(rownames(age_signature_cast),env=hgug4112aENTREZID)))
-symbol.full <- as.vector(unlist(mget(rownames(age_signature_cast),env=hgug4112aSYMBOL)))
 
+##### the file of up/down probes to write to file
+entrez.full<-as.vector(unlist(mget(rownames(exprs(sig.full.rm.eset)),env=hgug4112aENTREZID)))
+up_down<-cbind(entrez.full,age_signature_cast,medians.exprs.full.young,medians.exprs.full.old)
+colnames(up_down)<-c("entrezid","direction","median_young","median_old")
+write.table(up_down,file=paste("UpDown_", Sys.Date(),".txt",sep=""),sep="\t",col.names=NA)
 #write out this matrix of 1/-1 values to get relative increases/decreases with age
-toWrite_UpDown<-cbind(entrez.full,symbol.full,age_signature_cast)
-colnames(toWrite_UpDown)<-c("entrezID","Symbol","AgeIncreaseChange")
-write.table(toWrite_UpDown,file=paste("FullUpDown_", Sys.Date(),".txt",sep=""),sep="\t",col.names=NA)
-
+#age_names<-rownames(age_signature_full) #vector of probe'ids
 #####################################################################################
 
 
