@@ -214,4 +214,9 @@ fisher.test(age_summary)
 # fisher exact = 0.2226
 young  <- c(6, 4,3)
 cohort <- c(9,10,11)
+
 prop.trend.test(young, cohort) #p=.08
+
+# create a table:
+#young 6 4 3
+#old 3 6 8  look at row means score or non zero-correlation
