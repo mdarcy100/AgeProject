@@ -198,7 +198,13 @@ barplot(paul_cor[2:30], main ="Correlation  - sorted by age", names.arg=colname_
   #entrez id is not sorted anymore
 #featureData(paulSub.eset)$EntrezID<-rownames(paul.collapsed.entrezsorted)
 
-
+##################################################################################################
+##   color coding by age (see http://www.december.com/html/spec/colorcodes.html)
+##################################################################################################
+# < 30 = limegreen(SVG)  = #32CD32  (9 people < 30)
+#  30-39: royalblue (SVG) = #4169E1 (10 people 30-39)
+# 40-49: mediumorchid (SVG) = #BA55D3 (4 people 40-49)
+# 50+: darkmagenta (SVG) = #8B008B (7 people 50+)
 colors = c('#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#FF6699','#FF6699','#FF6699','#FF6699','#6600CC','#6600CC','#6600CC','#6600CC','#6600CC','#6600CC','#6600CC')
 jpeg('Figures/PaulBarPlot.jpeg')
 barplot(paul_cor[1:30],col=colors,main ="Correlation  - sorted by age")
