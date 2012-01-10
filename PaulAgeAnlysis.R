@@ -96,16 +96,16 @@ hist(apply(exprs(paul.scale.eset),1,median))
 
 
 ## Remove low variability probes from paul's data
-## DONT DO THIS - JUST FIND THE OVERLAP
-iqr.val.paul.scale <- esApply(paul.scale.eset,1,function(x){IQR(x,na.rm = TRUE)})
+## DONT DO THIS - JUST FIND THE OVERLAP because there were too few genes
+## iqr.val.paul.scale <- esApply(paul.scale.eset,1,function(x){IQR(x,na.rm = TRUE)})
 
 # they seem to be centered around .5
 hist(iqr.val.paul.scale,sqrt(length(iqr.val.paul.scale)))
 
-high.iqr.inds.paul<- which(iqr.val.paul.scale > median(iqr.val.paul.scale))
+#high.iqr.inds.paul<- which(iqr.val.paul.scale > median(iqr.val.paul.scale))
 
 paul.scale.eset <- paul.scale.eset[high.iqr.inds.paul,]
-dim(paul.scale.eset)
+dim(paul.scale.eset) # how many genes when filter by IQR
 ###Features  Samples 
 ###   12963       30 
 
@@ -205,8 +205,8 @@ barplot(paul_cor[2:30], main ="Correlation  - sorted by age", names.arg=colname_
 #  30-39: royalblue (SVG) = #4169E1 (10 people 30-39)
 # 40-49: mediumorchid (SVG) = #BA55D3 (4 people 40-49)
 # 50+: darkmagenta (SVG) = #8B008B (7 people 50+)
-colors = c('#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#33CC99','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#0000FF','#FF6699','#FF6699','#FF6699','#FF6699','#6600CC','#6600CC','#6600CC','#6600CC','#6600CC','#6600CC','#6600CC')
-jpeg('Figures/PaulBarPlot.jpeg')
+colors = c('#32CD32','#32CD32','#32CD32','#32CD32','#32CD32','#32CD32','#32CD32','#32CD32','#32CD32','#4169E1','#4169E1','#4169E1','#4169E1','#4169E1','#4169E1','#4169E1','#4169E1','#4169E1','#4169E1','#BA55D3','#BA55D3','#BA55D3','#BA55D3','#8B008B','#8B008B','#8B008B','#8B008B','#8B008B','#8B008B','#8B008B')
+jpeg('Figures/PaulBarPlot_Jan2010.jpeg')
 barplot(paul_cor[1:30],col=colors,main ="Correlation  - sorted by age")
 dev.off()
 
